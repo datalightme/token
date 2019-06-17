@@ -106,6 +106,20 @@ library SafeMath {
     }
 }
 
+ /**
+ * @title Contract that will work with ERC223 tokens.
+ */
+ 
+contract ERC223ReceivingContract { 
+/**
+ * @dev Standard ERC223 function that will handle incoming token transfers.
+ *
+ * @param _from  Token sender address.
+ * @param _value Amount of tokens.
+ */
+    function tokenFallback(address _from, uint _value) public;
+}
+
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
  * the optional functions; to access them see `ERC20Detailed`.
@@ -208,17 +222,22 @@ contract ERC20 is IERC20 {
     using SafeMath for uint256;
 
     mapping (address => uint256) private _balances;
-
+    
     mapping (address => mapping (address => uint256)) private _allowances;
 
     uint256 private _totalSupply;
-
+    string private _name;
+    string private _symbol;
+    uint8 private _decimals;
     /**
      * @dev See `IERC20.totalSupply`.
      */
      
-    constructor() public {
-    _totalSupply=1000000000000000000;
+    constructor(string memory name, string memory symbol, uint8 decimals, uint256 totalSupply) public {
+    _name = name;
+    _symbol = symbol;
+    _decimals = decimals;
+    _totalSupply=SafeMath.mul(totalSupply,10 ** uint256(decimals));
     _balances[msg.sender]=_totalSupply;
     emit Transfer(address(0), msg.sender, _totalSupply);
     } 
@@ -334,42 +353,26 @@ contract ERC20 is IERC20 {
      * - `recipient` cannot be the zero address.
      * - `sender` must have a balance of at least `amount`.
      */
+     
+     
     function _transfer(address sender, address recipient, uint256 amount) internal {
+        uint codeLength;
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
+         
+ 
+        assembly {
+            // Retrieve the size of the code on target address, this needs assembly .
+            codeLength := extcodesize(recipient)
+        }
 
         _balances[sender] = _balances[sender].sub(amount);
         _balances[recipient] = _balances[recipient].add(amount);
+        if(codeLength>0) {
+            ERC223ReceivingContract receiver = ERC223ReceivingContract(recipient);
+            receiver.tokenFallback(msg.sender, amount);
+        }
         emit Transfer(sender, recipient, amount);
-    }
-
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
-     * the total supply.
-     *
-     * Emits a `Transfer` event with `from` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `to` cannot be the zero address.
-     */
-
-     /**
-     * @dev Destoys `amount` tokens from `account`, reducing the
-     * total supply.
-     *
-     * Emits a `Transfer` event with `to` set to the zero address.
-     *
-     * Requirements
-     *
-     * - `account` cannot be the zero address.
-     * - `account` must have at least `amount` tokens.
-     */
-    function _burn(address account, uint256 value) internal {
-        require(account != address(0), "ERC20: burn from the zero address");
-
-        _totalSupply = _totalSupply.sub(value);
-        _balances[account] = _balances[account].sub(value);
-        emit Transfer(account, address(0), value);
     }
 
     /**
@@ -392,38 +395,7 @@ contract ERC20 is IERC20 {
         _allowances[owner][spender] = value;
         emit Approval(owner, spender, value);
     }
-
-    /**
-     * @dev Destoys `amount` tokens from `account`.`amount` is then deducted
-     * from the caller's allowance.
-     *
-     * See `_burn` and `_approve`.
-     */
-    function _burnFrom(address account, uint256 amount) internal {
-        _burn(account, amount);
-        _approve(account, msg.sender, _allowances[account][msg.sender].sub(amount));
-    }
-}
-
-/**
- * @dev Optional functions from the ERC20 standard.
- */
-contract ERC20Detailed is IERC20 {
-    string private _name;
-    string private _symbol;
-    uint8 private _decimals;
-
-    /**
-     * @dev Sets the values for `name`, `symbol`, and `decimals`. All three of
-     * these values are immutable: they can only be set once during
-     * construction.
-     */
-    constructor (string memory name, string memory symbol, uint8 decimals) public {
-        _name = name;
-        _symbol = symbol;
-        _decimals = decimals;
-    }
-
+    
     /**
      * @dev Returns the name of the token.
      */
@@ -454,17 +426,22 @@ contract ERC20Detailed is IERC20 {
     function decimals() public view returns (uint8) {
         return _decimals;
     }
+
 }
 
-contract dlToken is ERC20, ERC20Detailed {
+/**
+ * @dev Optional functions from the ERC20 standard.
+ */
+
+contract dlToken is ERC20{
 
     constructor(
         string memory name,
         string memory symbol,
-        uint8 decimals
+        uint8 decimals,
+        uint256 totalSupply
     )
-        ERC20Detailed(name, symbol, decimals)
-        ERC20()
+        ERC20(name, symbol, decimals,totalSupply)
         public
     {}
 }
