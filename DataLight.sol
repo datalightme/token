@@ -106,20 +106,6 @@ library SafeMath {
     }
 }
 
- /**
- * @title Contract that will work with ERC223 tokens.
- */
- 
-contract ERC223ReceivingContract { 
-/**
- * @dev Standard ERC223 function that will handle incoming token transfers.
- *
- * @param _from  Token sender address.
- * @param _value Amount of tokens.
- */
-    function tokenFallback(address _from, uint _value) public;
-}
-
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
  * the optional functions; to access them see `ERC20Detailed`.
@@ -356,22 +342,11 @@ contract ERC20 is IERC20 {
      
      
     function _transfer(address sender, address recipient, uint256 amount) internal {
-        uint codeLength;
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
-         
- 
-        assembly {
-            // Retrieve the size of the code on target address, this needs assembly .
-            codeLength := extcodesize(recipient)
-        }
 
         _balances[sender] = _balances[sender].sub(amount);
         _balances[recipient] = _balances[recipient].add(amount);
-        if(codeLength>0) {
-            ERC223ReceivingContract receiver = ERC223ReceivingContract(recipient);
-            receiver.tokenFallback(msg.sender, amount);
-        }
         emit Transfer(sender, recipient, amount);
     }
 
